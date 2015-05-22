@@ -2,6 +2,7 @@ var Promise = require('es6-promise').Promise;
 var log = require('./utils/log');
 var helper = require('./utils/config-helper');
 var UglifyJS = require("./wrappers/uglifyjs");
+var BabelJS = require("./wrappers/babeljs");
 var extend = require('util')._extend;
 var clean = require('./clean');
 var config, paths, globs, pkg, build = {};
@@ -43,6 +44,8 @@ build.htmlMin = function htmlMin(fileObjs) {
 
 build.scripts = function scripts(options, cb){
     var scriptsWrapper = helper.matches(config.tasks.build, ['browserify','requirejs']);
+    var babel = helper.matches(config.tasks.build, ['babel']);
+
     if (!scriptsWrapper) return Promise.resolve();
     log.info(' * Scripts');
 
@@ -51,10 +54,17 @@ build.scripts = function scripts(options, cb){
     options.browserify = pkg.browserify;
     options.browser = pkg.browser;
     options["browserify-shim"] = pkg["browserify-shim"];
+    //browserify
     return Promise.all([
         paths.demo && new Scripts(globs.demo.scripts, paths.target, options).write(),
         paths.target && new Scripts(globs.source.scripts, paths.target, options).write()
+    //es6to5
     ]).then(wait).then(function(fileObjPromises){
+        if(babel) {
+            return build.es6To5(fileObjPromises);
+        } else return fileObjPromises;
+    //uglify
+    }).then(wait).then(function(fileObjPromises){
         if (options.dev) return Promise.resolve();
         return build.jsMin(fileObjPromises[1]); ////only minify source code (not demo code)
     }).then(options.reload).catch(log.warn);
@@ -67,6 +77,16 @@ function wait(fileObjs){
         },100);
     });
 }
+
+build.es6To5 = function (fileObjs){
+    log.info(' * Compiling ES6 to ES5');
+    var promises = [];
+    fileObjs.forEach(function (fileObj, i) {
+        log.info('    * ' + fileObj.name);
+        promises.push(new BabelJS(fileObj, build.options).write());
+    });
+    return Promise.all(promises);
+};
 
 build.jsMin = function (fileObjs){
     log.info(' * Minifying JS');

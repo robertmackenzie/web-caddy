@@ -78,6 +78,7 @@
     "email": "peter.mouland@gmail.com"
   },
   "devDependencies": {
+    "babel-core": "^5.4.7",
     "istanbul": "^0.3.10",
     "jshint": "^2.6.3"
   },
